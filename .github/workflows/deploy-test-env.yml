@@ -179,7 +179,7 @@ jobs:
           fi
 
           if grep -q "Error acquiring the state lock" "$PLAN_LOG"; then
-            LOCK_ID="$(awk '/ID:/ { print $2; exit }' "$PLAN_LOG")"
+            LOCK_ID="$(grep -Eo '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$PLAN_LOG" | head -n 1 || true)"
             if [ -n "$LOCK_ID" ]; then
               echo "Terraform state lock detected (lock id: $LOCK_ID). Attempting force-unlock and single retry."
               terraform -chdir="$TERRAFORM_DIR" force-unlock -force "$LOCK_ID"
