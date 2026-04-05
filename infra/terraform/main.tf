@@ -40,6 +40,7 @@ locals {
 
   lambda_source_dir = "${path.module}/.build/runtime-bundle"
   lambda_zip_path   = "${path.module}/.build/runtime-bundle.zip"
+  supervisor_function_name = "${var.project_name}-supervisor-api-${var.environment}"
 
   stage_roles = {
     narrative_foundry = { role = "NARRATIVE_FOUNDRY", handler = "dist/runtime/lambda/handlers.narrativeFoundryHandler" }
@@ -191,6 +192,119 @@ resource "aws_iam_role_policy" "writer_execution" {
   name   = "${var.project_name}-execution-policy-${var.environment}"
   role   = aws_iam_role.writer_execution.id
   policy = data.aws_iam_policy_document.writer_execution.json
+}
+
+resource "aws_iam_role" "supervisor_api" {
+  count = var.enable_supervisor_api ? 1 : 0
+
+  name = "${var.project_name}-supervisor-api-${var.environment}"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+  tags = local.common_tags
+}
+
+data "aws_iam_policy_document" "supervisor_api" {
+  statement {
+    sid    = "AllowSupervisorCloudWatchLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.supervisor_function_name}:*"
+    ]
+  }
+
+  statement {
+    sid    = "AllowSupervisorStartAndReadExecution"
+    effect = "Allow"
+    actions = [
+      "states:StartExecution",
+      "states:DescribeExecution"
+    ]
+    resources = [
+      aws_sfn_state_machine.writer_workflow.arn,
+      "arn:${data.aws_partition.current.partition}:states:${var.aws_region}:${data.aws_caller_identity.current.account_id}:execution:${var.project_name}-workflow-${var.environment}:*"
+    ]
+  }
+
+  statement {
+    sid    = "AllowSupervisorArtifactReads"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:Query"
+    ]
+    resources = [aws_dynamodb_table.artifacts.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "supervisor_api" {
+  count = var.enable_supervisor_api ? 1 : 0
+
+  name   = "${var.project_name}-supervisor-api-policy-${var.environment}"
+  role   = aws_iam_role.supervisor_api[0].id
+  policy = data.aws_iam_policy_document.supervisor_api.json
+}
+
+resource "aws_lambda_function" "supervisor_api" {
+  count = var.enable_supervisor_api ? 1 : 0
+
+  function_name = local.supervisor_function_name
+  role          = aws_iam_role.supervisor_api[0].arn
+  runtime       = "nodejs20.x"
+  handler       = "dist/supervisor/lambdaHandler.handler"
+  timeout       = 30
+  memory_size   = 512
+
+  filename         = data.archive_file.runtime_skeleton.output_path
+  source_code_hash = data.archive_file.runtime_skeleton.output_base64sha256
+
+  environment {
+    variables = {
+      AWS_REGION             = var.aws_region
+      STATE_MACHINE_ARN      = aws_sfn_state_machine.writer_workflow.arn
+      ARTIFACT_DDB_TABLE     = aws_dynamodb_table.artifacts.name
+      SUPERVISOR_CORS_ORIGIN = length(var.supervisor_cors_allowed_origins) > 0 ? var.supervisor_cors_allowed_origins[0] : "*"
+    }
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_lambda_function_url" "supervisor_api" {
+  count = var.enable_supervisor_api ? 1 : 0
+
+  function_name      = aws_lambda_function.supervisor_api[0].function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_headers = ["content-type", "authorization"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_origins = var.supervisor_cors_allowed_origins
+    max_age       = 300
+  }
+}
+
+resource "aws_lambda_permission" "supervisor_api_url" {
+  count = var.enable_supervisor_api ? 1 : 0
+
+  statement_id           = "AllowPublicInvokeFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.supervisor_api[0].function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
 }
 
 resource "aws_sfn_state_machine" "writer_workflow" {

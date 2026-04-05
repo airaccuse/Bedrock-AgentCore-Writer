@@ -21,6 +21,11 @@ on:
         options:
           - "false"
           - "true"
+      supervisor_cors_origin:
+        description: Allowed browser origin for Supervisor API CORS
+        required: true
+        default: "*"
+        type: string
 
 permissions:
   id-token: write
@@ -147,6 +152,8 @@ jobs:
       - name: Terraform plan
         run: |
           terraform -chdir="$TERRAFORM_DIR" plan \
+            -var="enable_supervisor_api=true" \
+            -var="supervisor_cors_allowed_origins=[\"${{ inputs.supervisor_cors_origin }}\"]" \
             -var="alarm_actions=[\"$ALARM_SNS_TOPIC_ARN\"]" \
             -out=tfplan
 
@@ -169,3 +176,13 @@ jobs:
         run: |
           export STATE_MACHINE_ARN="$(terraform -chdir=$TERRAFORM_DIR output -raw state_machine_arn)"
           npm run smoke:stepfunctions
+
+      - name: Emit deploy endpoints
+        run: |
+          SUPERVISOR_URL="$(terraform -chdir=$TERRAFORM_DIR output -raw supervisor_api_url)"
+          echo "Supervisor API URL: $SUPERVISOR_URL"
+          {
+            echo "## Deploy Outputs"
+            echo ""
+            echo "- Supervisor API URL: $SUPERVISOR_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

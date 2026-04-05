@@ -144,3 +144,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_supervisor_api" {
+  description = "Whether to deploy the Supervisor API Lambda endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "supervisor_cors_allowed_origins" {
+  description = "Allowed origins for Supervisor API Lambda URL CORS"
+  type        = list(string)
+  default     = ["*"]
+}

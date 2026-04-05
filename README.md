@@ -115,7 +115,9 @@ Notes:
 
 - It can incur Bedrock/DynamoDB cost.
 - It supports `BEDROCK_STRICT_CONTRACTS` as a manual input when dispatching.
+- It supports `supervisor_cors_origin` as a manual input for Supervisor API browser access.
 - The strict rollout gate always runs with `BEDROCK_STRICT_CONTRACTS=true` plus runtime write probe.
+- After deploy, workflow summary includes Supervisor API URL output.
 
 Required repository secrets for deploy-test-env workflow:
 
@@ -142,3 +144,28 @@ Runtime skeleton files now available:
 - `src/runtime/stepFunctions/types.ts`
 - `src/runtime/lambda/shared.ts`
 - `src/runtime/lambda/handlers.ts`
+
+## Supervisor API MVP
+
+For UI integration, a minimal Supervisor API bridge is available:
+
+- Server entrypoint: `src/supervisor/server.ts`
+- Contract doc: `docs/SUPERVISOR_API_MVP.md`
+
+Run locally:
+
+- `npm run dev:supervisor`
+
+Required environment variables:
+
+- `AWS_REGION`
+- `STATE_MACHINE_ARN`
+- `ARTIFACT_DDB_TABLE`
+
+## UI MVP (Amplify)
+
+A static UI MVP is available in `ui/` and can be hosted in Amplify.
+
+- UI: `ui/index.html`
+- Amplify config: `amplify.yml`
+- Deployment guide: `docs/UI_MVP_AMPLIFY.md`

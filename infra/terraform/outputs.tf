@@ -55,3 +55,13 @@ output "application_env" {
     MODEL_EVALUATOR     = var.model_evaluator
   }
 }
+
+output "supervisor_api_lambda_arn" {
+  description = "Supervisor API Lambda ARN when enabled"
+  value       = var.enable_supervisor_api ? aws_lambda_function.supervisor_api[0].arn : null
+}
+
+output "supervisor_api_url" {
+  description = "Public Supervisor API Lambda URL when enabled"
+  value       = var.enable_supervisor_api ? aws_lambda_function_url.supervisor_api[0].function_url : null
+}
