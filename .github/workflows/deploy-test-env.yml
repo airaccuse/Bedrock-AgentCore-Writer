@@ -31,6 +31,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: deploy-test-env-${{ inputs.environment }}
+  cancel-in-progress: false
+
 jobs:
   deploy-test-env:
     runs-on: ubuntu-latest
@@ -151,11 +155,44 @@ jobs:
 
       - name: Terraform plan
         run: |
-          terraform -chdir="$TERRAFORM_DIR" plan \
-            -var="enable_supervisor_api=true" \
-            -var="supervisor_cors_allowed_origins=[\"${{ inputs.supervisor_cors_origin }}\"]" \
-            -var="alarm_actions=[\"$ALARM_SNS_TOPIC_ARN\"]" \
+          set -euo pipefail
+
+          PLAN_ARGS=(
+            -var="enable_supervisor_api=true"
+            -var="supervisor_cors_allowed_origins=[\"${{ inputs.supervisor_cors_origin }}\"]"
+            -var="alarm_actions=[\"$ALARM_SNS_TOPIC_ARN\"]"
             -out=tfplan
+          )
+
+          plan_with_log() {
+            local log_file="$1"
+            set +e
+            terraform -chdir="$TERRAFORM_DIR" plan "${PLAN_ARGS[@]}" 2>&1 | tee "$log_file"
+            local rc=${PIPESTATUS[0]}
+            set -e
+            return "$rc"
+          }
+
+          PLAN_LOG="$(mktemp)"
+          if plan_with_log "$PLAN_LOG"; then
+            exit 0
+          fi
+
+          if grep -q "Error acquiring the state lock" "$PLAN_LOG"; then
+            LOCK_ID="$(awk '/ID:/ { print $2; exit }' "$PLAN_LOG")"
+            if [ -n "$LOCK_ID" ]; then
+              echo "Terraform state lock detected (lock id: $LOCK_ID). Attempting force-unlock and single retry."
+              terraform -chdir="$TERRAFORM_DIR" force-unlock -force "$LOCK_ID"
+
+              RETRY_LOG="$(mktemp)"
+              if plan_with_log "$RETRY_LOG"; then
+                exit 0
+              fi
+            fi
+          fi
+
+          echo "Terraform plan failed."
+          exit 1
 
       - name: Terraform apply
         run: terraform -chdir="$TERRAFORM_DIR" apply -auto-approve tfplan
