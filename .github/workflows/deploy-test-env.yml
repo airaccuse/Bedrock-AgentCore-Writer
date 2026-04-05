@@ -107,6 +107,40 @@ jobs:
             -backend-config="dynamodb_table=$TF_STATE_LOCK_TABLE" \
             -backend-config="encrypt=true"
 
+      - name: Terraform import existing resources (best-effort)
+        run: |
+          set -euo pipefail
+
+          if [ "$(terraform -chdir="$TERRAFORM_DIR" state list 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then
+            echo "Remote state already has resources; skipping import bootstrap."
+            exit 0
+          fi
+
+          PROJECT="bedrock-agentcore-writer"
+          ENV_NAME="${{ inputs.environment }}"
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          AWS_REGION="${{ inputs.aws_region }}"
+
+          import_if_present() {
+            local address="$1"
+            local id="$2"
+            terraform -chdir="$TERRAFORM_DIR" import "$address" "$id" >/dev/null 2>&1 || true
+          }
+
+          import_if_present 'aws_dynamodb_table.artifacts' "${PROJECT}-artifacts-${ENV_NAME}"
+          import_if_present 'aws_iam_role.writer_execution' "${PROJECT}-execution-${ENV_NAME}"
+          import_if_present 'aws_iam_role_policy.writer_execution' "${PROJECT}-execution-${ENV_NAME}:${PROJECT}-execution-policy-${ENV_NAME}"
+          import_if_present 'aws_sfn_state_machine.writer_workflow' "arn:aws:states:${AWS_REGION}:${ACCOUNT_ID}:stateMachine:${PROJECT}-workflow-${ENV_NAME}"
+          import_if_present 'aws_cloudwatch_log_group.stepfunctions_logs' "/aws/vendedlogs/states/${PROJECT}-workflow-${ENV_NAME}"
+          import_if_present 'aws_cloudwatch_log_resource_policy.stepfunctions_delivery' "${PROJECT}-stepfunctions-logs-${ENV_NAME}"
+          import_if_present 'aws_cloudwatch_metric_alarm.stepfunctions_executions_failed' "${PROJECT}-workflow-executions-failed-${ENV_NAME}"
+          import_if_present 'aws_cloudwatch_dashboard.operations[0]' "${PROJECT}-operations-${ENV_NAME}"
+
+          for stage in narrative_foundry ghostwriter compression continuity style evaluator; do
+            import_if_present "aws_lambda_function.stage_handlers[\"${stage}\"]" "${PROJECT}-${stage}-${ENV_NAME}"
+            import_if_present "aws_cloudwatch_metric_alarm.lambda_errors[\"${stage}\"]" "${PROJECT}-${stage}-${ENV_NAME}-errors-${ENV_NAME}"
+          done
+
       - name: Terraform validate
         run: terraform -chdir="$TERRAFORM_DIR" validate
 
