@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "narrative-foundry-output.schema.json",
+  "title": "NarrativeFoundryOutput",
+  "type": "object",
+  "required": [
+    "premise",
+    "thematic_thesis",
+    "story_architecture",
+    "scene_cards",
+    "reveal_schedule",
+    "risk_register"
+  ],
+  "properties": {
+    "premise": { "type": "string", "minLength": 20 },
+    "thematic_thesis": { "type": "string", "minLength": 20 },
+    "story_architecture": {
+      "type": "object",
+      "required": ["mode", "acts"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["three-act", "four-act", "hero-variant", "braided"] },
+        "acts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["act", "purpose", "beats"],
+            "properties": {
+              "act": { "type": "integer", "minimum": 1 },
+              "purpose": { "type": "string" },
+              "beats": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scene_cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "goal", "conflict", "turn", "outcome", "word_target"],
+        "properties": {
+          "scene_id": { "type": "string" },
+          "goal": { "type": "string" },
+          "conflict": { "type": "string" },
+          "turn": { "type": "string" },
+          "outcome": { "type": "string" },
+          "word_target": { "type": "integer", "minimum": 100 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "reveal_schedule": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reveal", "timing", "purpose"],
+        "properties": {
+          "reveal": { "type": "string" },
+          "timing": { "type": "string" },
+          "purpose": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "risk_register": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["risk", "severity", "mitigation"],
+        "properties": {
+          "risk": { "type": "string" },
+          "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+          "mitigation": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

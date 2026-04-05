@@ -1,0 +1,32 @@
+{
+  "name": "bedrock-agentcore-writer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "validate:schemas": "tsx scripts/validate-schemas.ts",
+    "verify:runtime": "tsx scripts/verify-runtime.ts",
+    "test:adapters": "tsx scripts/test-adapters.ts",
+    "test:workflow": "tsx scripts/test-workflow-sequence.ts",
+    "build:lambda-bundle": "tsx scripts/build-lambda-bundle.ts",
+    "smoke:stepfunctions": "tsx scripts/smoke-stepfunctions.ts",
+    "smoke:stepfunctions:strict5": "SMOKE_RUNS=5 tsx scripts/smoke-stepfunctions.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.884.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.884.0",
+    "@aws-sdk/client-dynamodb": "^3.884.0",
+    "@aws-sdk/lib-dynamodb": "^3.884.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "dotenv": "^16.4.7",
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}

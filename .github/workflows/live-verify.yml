@@ -1,0 +1,50 @@
+name: Live Runtime Verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region for verification
+        required: true
+        default: us-east-1
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      MODEL_FOUNDRY: ${{ secrets.MODEL_FOUNDRY }}
+      MODEL_GHOSTWRITER: ${{ secrets.MODEL_GHOSTWRITER }}
+      MODEL_EVALUATOR: ${{ secrets.MODEL_EVALUATOR }}
+      ARTIFACT_STORE_MODE: dynamodb
+      ARTIFACT_DDB_TABLE: ${{ secrets.ARTIFACT_DDB_TABLE }}
+      VERIFY_RUNTIME_MODE: live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify runtime config (live)
+        run: npm run verify:runtime

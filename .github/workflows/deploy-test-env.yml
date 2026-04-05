@@ -1,0 +1,137 @@
+name: Deploy Test Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region for test environment
+        required: true
+        default: us-east-1
+        type: string
+      environment:
+        description: Terraform environment suffix
+        required: true
+        default: test
+        type: string
+      bedrock_strict_contracts:
+        description: Enforce strict raw model schema compliance
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-test-env:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TERRAFORM_DIR: infra/terraform
+      USE_LOCAL_STUB_ROUTER: "false"
+      BEDROCK_STRICT_CONTRACTS: ${{ inputs.bedrock_strict_contracts }}
+      ARTIFACT_STORE_MODE: dynamodb
+      MODEL_FOUNDRY: ${{ secrets.MODEL_FOUNDRY }}
+      MODEL_GHOSTWRITER: ${{ secrets.MODEL_GHOSTWRITER }}
+      MODEL_COMPRESSION: ${{ secrets.MODEL_COMPRESSION != '' && secrets.MODEL_COMPRESSION || secrets.MODEL_GHOSTWRITER }}
+      MODEL_CONTINUITY: ${{ secrets.MODEL_CONTINUITY != '' && secrets.MODEL_CONTINUITY || secrets.MODEL_GHOSTWRITER }}
+      MODEL_STYLE: ${{ secrets.MODEL_STYLE != '' && secrets.MODEL_STYLE || secrets.MODEL_GHOSTWRITER }}
+      MODEL_EVALUATOR: ${{ secrets.MODEL_EVALUATOR }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
+      ALARM_SNS_TOPIC_ARN: ${{ secrets.ALARM_SNS_TOPIC_ARN }}
+      TF_VAR_aws_region: ${{ inputs.aws_region }}
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_use_local_stub_router: "false"
+      TF_VAR_bedrock_strict_contracts: ${{ inputs.bedrock_strict_contracts }}
+      TF_VAR_model_foundry: ${{ secrets.MODEL_FOUNDRY }}
+      TF_VAR_model_ghostwriter: ${{ secrets.MODEL_GHOSTWRITER }}
+      TF_VAR_model_compression: ${{ secrets.MODEL_COMPRESSION != '' && secrets.MODEL_COMPRESSION || secrets.MODEL_GHOSTWRITER }}
+      TF_VAR_model_continuity: ${{ secrets.MODEL_CONTINUITY != '' && secrets.MODEL_CONTINUITY || secrets.MODEL_GHOSTWRITER }}
+      TF_VAR_model_style: ${{ secrets.MODEL_STYLE != '' && secrets.MODEL_STYLE || secrets.MODEL_GHOSTWRITER }}
+      TF_VAR_model_evaluator: ${{ secrets.MODEL_EVALUATOR }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Validate required deploy secrets
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in TF_STATE_BUCKET TF_STATE_LOCK_TABLE ALARM_SNS_TOPIC_ARN MODEL_FOUNDRY MODEL_GHOSTWRITER MODEL_EVALUATOR; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runtime and Lambda bundle
+        run: |
+          npm run build
+          npm run build:lambda-bundle
+
+      - name: Terraform init (remote state)
+        run: |
+          terraform -chdir="$TERRAFORM_DIR" init -reconfigure \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=bedrock-agentcore-writer/${{ inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ inputs.aws_region }}" \
+            -backend-config="dynamodb_table=$TF_STATE_LOCK_TABLE" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform validate
+        run: terraform -chdir="$TERRAFORM_DIR" validate
+
+      - name: Terraform plan
+        run: |
+          terraform -chdir="$TERRAFORM_DIR" plan \
+            -var="alarm_actions=[\"$ALARM_SNS_TOPIC_ARN\"]" \
+            -out=tfplan
+
+      - name: Terraform apply
+        run: terraform -chdir="$TERRAFORM_DIR" apply -auto-approve tfplan
+
+      - name: Runtime verify (live)
+        env:
+          VERIFY_RUNTIME_MODE: live
+          VERIFY_RUNTIME_WRITE_TEST: "true"
+          ARTIFACT_DDB_TABLE: ""
+        run: |
+          export ARTIFACT_DDB_TABLE="$(terraform -chdir=$TERRAFORM_DIR output -raw artifact_table_name)"
+          npm run verify:runtime
+
+      - name: Post-deploy smoke (Step Functions)
+        env:
+          SMOKE_RUNS: "1"
+          SMOKE_TIMEOUT_SECONDS: "300"
+        run: |
+          export STATE_MACHINE_ARN="$(terraform -chdir=$TERRAFORM_DIR output -raw state_machine_arn)"
+          npm run smoke:stepfunctions

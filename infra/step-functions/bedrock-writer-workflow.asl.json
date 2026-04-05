@@ -1,0 +1,55 @@
+{
+  "Comment": "Bedrock AgentCore Writer workflow",
+  "StartAt": "NarrativeFoundry",
+  "States": {
+    "NarrativeFoundry": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Ghostwriter"
+    },
+    "Ghostwriter": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Compression"
+    },
+    "Compression": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Continuity"
+    },
+    "Continuity": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Style"
+    },
+    "Style": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Evaluator"
+    },
+    "Evaluator": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "PassOrRewrite"
+    },
+    "PassOrRewrite": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.evaluation.decision",
+          "StringEquals": "PASS",
+          "Next": "Success"
+        }
+      ],
+      "Default": "Rewrite"
+    },
+    "Rewrite": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "Evaluator"
+    },
+    "Success": {
+      "Type": "Succeed"
+    }
+  }
+}

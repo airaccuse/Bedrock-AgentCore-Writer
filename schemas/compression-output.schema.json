@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "compression-output.schema.json",
+  "title": "CompressionOutput",
+  "type": "object",
+  "required": ["scene_id", "prose", "compression_notes"],
+  "properties": {
+    "scene_id": { "type": "string" },
+    "prose": { "type": "string", "minLength": 200 },
+    "compression_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

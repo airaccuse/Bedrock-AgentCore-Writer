@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "global-envelope.schema.json",
+  "title": "GlobalEnvelope",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "project_id",
+    "book_id",
+    "chapter_id",
+    "agent_role",
+    "timestamp_utc",
+    "input_artifact_refs",
+    "constraints",
+    "payload",
+    "trace"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "run_id": { "type": "string", "minLength": 8 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": ["string", "null"] },
+    "agent_role": {
+      "type": "string",
+      "enum": [
+        "NARRATIVE_FOUNDRY",
+        "GHOSTWRITER",
+        "COMPRESSION",
+        "CONTINUITY",
+        "STYLE",
+        "EVALUATOR"
+      ]
+    },
+    "timestamp_utc": { "type": "string", "format": "date-time" },
+    "input_artifact_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["target_words", "pov", "tense", "content_policy", "must_include", "must_avoid"],
+      "properties": {
+        "target_words": { "type": "integer", "minimum": 100 },
+        "pov": { "type": "string", "enum": ["first", "third-limited", "omniscient"] },
+        "tense": { "type": "string", "enum": ["past", "present"] },
+        "content_policy": { "type": "array", "items": { "type": "string" } },
+        "must_include": { "type": "array", "items": { "type": "string" } },
+        "must_avoid": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "payload": { "type": "object" },
+    "trace": {
+      "type": "object",
+      "required": ["prompt_template_id", "model_id", "temperature"],
+      "properties": {
+        "prompt_template_id": { "type": "string" },
+        "model_id": { "type": "string" },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

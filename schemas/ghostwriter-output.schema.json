@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ghostwriter-output.schema.json",
+  "title": "GhostwriterOutput",
+  "type": "object",
+  "required": ["scene_id", "prose", "beat_alignment", "continuity_assumptions"],
+  "properties": {
+    "scene_id": { "type": "string" },
+    "prose": { "type": "string", "minLength": 200 },
+    "beat_alignment": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["beat", "status", "notes"],
+        "properties": {
+          "beat": { "type": "string" },
+          "status": { "type": "string", "enum": ["covered", "partial", "missing"] },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "continuity_assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

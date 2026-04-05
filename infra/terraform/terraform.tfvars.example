@@ -1,0 +1,38 @@
+aws_region = "us-east-1"
+project_name = "bedrock-agentcore-writer"
+environment = "dev"
+
+# Optional: override table naming convention
+# artifact_table_name = "bedrock-agentcore-writer-artifacts-dev"
+
+# Restrict runtime permissions to approved models
+bedrock_model_ids = [
+  "us.anthropic.claude-sonnet-4-6",
+  "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+]
+
+model_foundry = "us.anthropic.claude-sonnet-4-6"
+model_ghostwriter = "us.anthropic.claude-sonnet-4-6"
+model_compression = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+model_continuity = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+model_style = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+model_evaluator = "us.anthropic.claude-sonnet-4-6"
+max_revisions = 2
+stage_lambda_timeout_seconds = 120
+use_local_stub_router = false
+bedrock_strict_contracts = false
+log_retention_days = 14
+dashboard_enabled = true
+monthly_budget_limit_usd = 0
+budget_alert_email = ""
+
+# Optional: add SNS topic ARNs for alarms
+# alarm_actions = ["arn:aws:sns:us-east-1:123456789012:writer-alerts"]
+
+# Optional: enable monthly budget notifications
+# monthly_budget_limit_usd = 50
+# budget_alert_email = "alerts@example.com"
+
+tags = {
+  Owner = "eric"
+}

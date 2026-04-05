@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "style-output.schema.json",
+  "title": "StyleOutput",
+  "type": "object",
+  "required": ["scene_id", "prose", "style_notes"],
+  "properties": {
+    "scene_id": { "type": "string" },
+    "prose": { "type": "string", "minLength": 200 },
+    "style_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

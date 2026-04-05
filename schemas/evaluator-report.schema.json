@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluator-report.schema.json",
+  "title": "EvaluatorReport",
+  "type": "object",
+  "required": [
+    "overall_score",
+    "decision",
+    "category_scores",
+    "hard_gate_checks",
+    "rewrite_directives",
+    "confidence"
+  ],
+  "properties": {
+    "overall_score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "decision": { "type": "string", "enum": ["PASS", "REWRITE"] },
+    "category_scores": {
+      "type": "object",
+      "required": [
+        "coherence",
+        "character_depth",
+        "voice_originality",
+        "scene_craft",
+        "worldbuilding_integration",
+        "prose_precision",
+        "dialogue_subtext",
+        "market_fit"
+      ],
+      "properties": {
+        "coherence": { "type": "number", "minimum": 0, "maximum": 100 },
+        "character_depth": { "type": "number", "minimum": 0, "maximum": 100 },
+        "voice_originality": { "type": "number", "minimum": 0, "maximum": 100 },
+        "scene_craft": { "type": "number", "minimum": 0, "maximum": 100 },
+        "worldbuilding_integration": { "type": "number", "minimum": 0, "maximum": 100 },
+        "prose_precision": { "type": "number", "minimum": 0, "maximum": 100 },
+        "dialogue_subtext": { "type": "number", "minimum": 0, "maximum": 100 },
+        "market_fit": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "hard_gate_checks": {
+      "type": "object",
+      "required": ["min_overall_met", "no_category_below_70", "coherence_min_80", "scene_craft_min_80"],
+      "properties": {
+        "min_overall_met": { "type": "boolean" },
+        "no_category_below_70": { "type": "boolean" },
+        "coherence_min_80": { "type": "boolean" },
+        "scene_craft_min_80": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "rewrite_directives": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["priority", "directive", "target_span", "expected_score_lift"],
+        "properties": {
+          "priority": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "directive": { "type": "string" },
+          "target_span": { "type": "string" },
+          "expected_score_lift": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": false
+}

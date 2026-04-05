@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "continuity-output.schema.json",
+  "title": "ContinuityOutput",
+  "type": "object",
+  "required": ["scene_id", "prose", "continuity_assumptions"],
+  "properties": {
+    "scene_id": { "type": "string" },
+    "prose": { "type": "string", "minLength": 200 },
+    "continuity_assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

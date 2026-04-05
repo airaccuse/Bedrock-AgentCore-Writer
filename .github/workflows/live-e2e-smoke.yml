@@ -1,0 +1,68 @@
+name: Live E2E Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region for smoke run
+        required: true
+        default: us-east-1
+        type: string
+      bedrock_strict_contracts:
+        description: Enforce strict raw model schema compliance
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  smoke-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      USE_LOCAL_STUB_ROUTER: "false"
+      BEDROCK_STRICT_CONTRACTS: ${{ inputs.bedrock_strict_contracts }}
+      MODEL_FOUNDRY: ${{ secrets.MODEL_FOUNDRY }}
+      MODEL_GHOSTWRITER: ${{ secrets.MODEL_GHOSTWRITER }}
+      MODEL_EVALUATOR: ${{ secrets.MODEL_EVALUATOR }}
+      ARTIFACT_STORE_MODE: dynamodb
+      ARTIFACT_DDB_TABLE: ${{ secrets.ARTIFACT_DDB_TABLE }}
+      VERIFY_RUNTIME_MODE: live
+      QUALITY_GATE_MIN_OVERALL: "86"
+      QUALITY_GATE_MIN_CATEGORY: "70"
+      QUALITY_GATE_MIN_COHERENCE: "80"
+      QUALITY_GATE_MIN_SCENE_CRAFT: "80"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify runtime config (live)
+        run: npm run verify:runtime
+
+      - name: Run live workflow smoke test
+        run: npm run dev

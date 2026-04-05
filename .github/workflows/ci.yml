@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      MODEL_FOUNDRY: us.anthropic.claude-sonnet-4-6
+      MODEL_GHOSTWRITER: us.anthropic.claude-sonnet-4-6
+      MODEL_COMPRESSION: us.anthropic.claude-haiku-4-5-20251001-v1:0
+      MODEL_CONTINUITY: us.anthropic.claude-haiku-4-5-20251001-v1:0
+      MODEL_STYLE: us.anthropic.claude-haiku-4-5-20251001-v1:0
+      MODEL_EVALUATOR: us.anthropic.claude-sonnet-4-6
+      ARTIFACT_STORE_MODE: dynamodb
+      ARTIFACT_DDB_TABLE: bedrock-agentcore-writer-artifacts-dev
+      VERIFY_RUNTIME_MODE: offline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate schemas
+        run: npm run validate:schemas
+
+      - name: Build
+        run: npm run build
+
+      - name: Adapter regression checks
+        run: npm run test:adapters
+
+      - name: Workflow integration checks
+        run: npm run test:workflow
+
+      - name: Verify runtime config (offline)
+        run: npm run verify:runtime
