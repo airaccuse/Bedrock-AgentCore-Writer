@@ -360,9 +360,9 @@ resource "aws_cloudwatch_metric_alarm" "stepfunctions_executions_failed" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  for_each = aws_lambda_function.stage_handlers
+  for_each = local.stage_roles
 
-  alarm_name          = "${each.value.function_name}-errors-${var.environment}"
+  alarm_name          = "${var.project_name}-${each.key}-${var.environment}-errors-${var.environment}"
   alarm_description   = "Alarm when Lambda function has invocation errors"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
@@ -376,7 +376,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   ok_actions          = var.alarm_actions
 
   dimensions = {
-    FunctionName = each.value.function_name
+    FunctionName = "${var.project_name}-${each.key}-${var.environment}"
   }
 
   tags = local.common_tags
