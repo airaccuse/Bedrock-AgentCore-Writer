@@ -273,7 +273,6 @@ resource "aws_lambda_function" "supervisor_api" {
 
   environment {
     variables = {
-      AWS_REGION             = var.aws_region
       STATE_MACHINE_ARN      = aws_sfn_state_machine.writer_workflow.arn
       ARTIFACT_DDB_TABLE     = aws_dynamodb_table.artifacts.name
       SUPERVISOR_CORS_ORIGIN = length(var.supervisor_cors_allowed_origins) > 0 ? var.supervisor_cors_allowed_origins[0] : "*"
