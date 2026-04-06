@@ -140,8 +140,12 @@ jobs:
               return "$rc"
             }
 
-            import_once "$import_log"
-            local rc=$?
+            local rc
+            if import_once "$import_log"; then
+              rc=0
+            else
+              rc=$?
+            fi
 
             if [ "$rc" -eq 0 ]; then
               return 0
@@ -160,8 +164,12 @@ jobs:
 
                 local retry_log
                 retry_log="$(mktemp)"
-                import_once "$retry_log"
-                local retry_rc=$?
+                local retry_rc
+                if import_once "$retry_log"; then
+                  retry_rc=0
+                else
+                  retry_rc=$?
+                fi
                 if [ "$retry_rc" -eq 0 ]; then
                   return 0
                 fi
