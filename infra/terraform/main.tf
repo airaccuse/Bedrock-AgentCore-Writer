@@ -290,7 +290,7 @@ resource "aws_lambda_function_url" "supervisor_api" {
 
   cors {
     allow_headers = ["content-type", "authorization"]
-    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_methods = ["GET", "POST"]
     allow_origins = var.supervisor_cors_allowed_origins
     max_age       = 300
   }
