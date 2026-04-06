@@ -120,11 +120,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "$(terraform -chdir="$TERRAFORM_DIR" state list 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then
-            echo "Remote state already has resources; skipping import bootstrap."
-            exit 0
-          fi
-
           PROJECT="bedrock-agentcore-writer"
           ENV_NAME="${{ inputs.environment }}"
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -144,6 +139,12 @@ jobs:
           import_if_present 'aws_cloudwatch_log_resource_policy.stepfunctions_delivery' "${PROJECT}-stepfunctions-logs-${ENV_NAME}"
           import_if_present 'aws_cloudwatch_metric_alarm.stepfunctions_executions_failed' "${PROJECT}-workflow-executions-failed-${ENV_NAME}"
           import_if_present 'aws_cloudwatch_dashboard.operations[0]' "${PROJECT}-operations-${ENV_NAME}"
+
+          import_if_present 'aws_iam_role.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}"
+          import_if_present 'aws_iam_role_policy.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}:${PROJECT}-supervisor-api-policy-${ENV_NAME}"
+          import_if_present 'aws_lambda_function.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}"
+          import_if_present 'aws_lambda_function_url.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}"
+          import_if_present 'aws_lambda_permission.supervisor_api_public_invoke[0]' "${PROJECT}-supervisor-api-${ENV_NAME}/FunctionURLAllowPublicInvoke"
 
           for stage in narrative_foundry ghostwriter compression continuity style evaluator; do
             import_if_present "aws_lambda_function.stage_handlers[\"${stage}\"]" "${PROJECT}-${stage}-${ENV_NAME}"
