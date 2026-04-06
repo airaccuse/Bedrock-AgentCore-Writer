@@ -197,7 +197,7 @@ jobs:
           import_if_present 'aws_iam_role_policy.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}:${PROJECT}-supervisor-api-policy-${ENV_NAME}"
           import_if_present 'aws_lambda_function.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}"
           import_if_present 'aws_lambda_function_url.supervisor_api[0]' "${PROJECT}-supervisor-api-${ENV_NAME}"
-          import_if_present 'aws_lambda_permission.supervisor_api_public_invoke[0]' "${PROJECT}-supervisor-api-${ENV_NAME}/FunctionURLAllowPublicInvoke"
+          import_if_present 'aws_lambda_permission.supervisor_api_url[0]' "${PROJECT}-supervisor-api-${ENV_NAME}/AllowPublicInvokeFunctionUrl"
 
           for stage in narrative_foundry ghostwriter compression continuity style evaluator; do
             import_if_present "aws_lambda_function.stage_handlers[\"${stage}\"]" "${PROJECT}-${stage}-${ENV_NAME}"
