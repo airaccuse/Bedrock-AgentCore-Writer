@@ -131,10 +131,17 @@ jobs:
             local import_log
             import_log="$(mktemp)"
 
-            set +e
-            terraform -chdir="$TERRAFORM_DIR" import "$address" "$id" 2>&1 | tee "$import_log"
-            local rc=${PIPESTATUS[0]}
-            set -e
+            import_once() {
+              local log_file="$1"
+              set +e
+              terraform -chdir="$TERRAFORM_DIR" import "$address" "$id" 2>&1 | tee "$log_file"
+              local rc=${PIPESTATUS[0]}
+              set -e
+              return "$rc"
+            }
+
+            import_once "$import_log"
+            local rc=$?
 
             if [ "$rc" -eq 0 ]; then
               return 0
@@ -150,8 +157,18 @@ jobs:
               if [ -n "$lock_id" ]; then
                 echo "State lock detected during import ($address). Unlocking lock id: $lock_id"
                 terraform -chdir="$TERRAFORM_DIR" force-unlock -force "$lock_id"
-                terraform -chdir="$TERRAFORM_DIR" import "$address" "$id"
-                return 0
+
+                local retry_log
+                retry_log="$(mktemp)"
+                import_once "$retry_log"
+                local retry_rc=$?
+                if [ "$retry_rc" -eq 0 ]; then
+                  return 0
+                fi
+
+                if grep -q "Cannot import non-existent remote object" "$retry_log" || grep -q "Resource already managed by Terraform" "$retry_log"; then
+                  return 0
+                fi
               fi
             fi
 
