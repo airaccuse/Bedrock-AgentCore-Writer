@@ -13,6 +13,10 @@ const region = requireEnv("AWS_REGION");
 const artifactMode = process.env.ARTIFACT_STORE_MODE ?? "local";
 const verifyMode = process.env.VERIFY_RUNTIME_MODE ?? "live";
 const writeProbeEnabled = process.env.VERIFY_RUNTIME_WRITE_TEST === "true";
+const supervisorE2EEnabled = process.env.VERIFY_SUPERVISOR_E2E === "true";
+const supervisorApiBase = process.env.SUPERVISOR_API_BASE;
+const supervisorTimeoutSeconds = parsePositiveInt(process.env.SUPERVISOR_E2E_TIMEOUT_SECONDS, 300);
+const supervisorPollSeconds = parsePositiveInt(process.env.SUPERVISOR_E2E_POLL_SECONDS, 5);
 
 const modelConfig: Array<{ name: string; id: string }> = [
   { name: "MODEL_FOUNDRY", id: requireEnv("MODEL_FOUNDRY") },
@@ -26,6 +30,7 @@ async function main(): Promise<void> {
   console.log(`Region: ${region}`);
   console.log(`Artifact store mode: ${artifactMode}`);
   console.log(`Write probe enabled: ${writeProbeEnabled}`);
+  console.log(`Supervisor API e2e enabled: ${supervisorE2EEnabled}`);
 
   validateLocalConfiguration();
 
@@ -90,7 +95,96 @@ async function main(): Promise<void> {
     console.log("Skipping DynamoDB verification because ARTIFACT_STORE_MODE is not dynamodb");
   }
 
+  if (supervisorE2EEnabled) {
+    await verifySupervisorE2E();
+  } else {
+    console.log("Skipping Supervisor API e2e verification");
+  }
+
   console.log("Runtime verification complete");
+}
+
+async function verifySupervisorE2E(): Promise<void> {
+  if (!supervisorApiBase?.trim()) {
+    throw new Error("SUPERVISOR_API_BASE is required when VERIFY_SUPERVISOR_E2E=true");
+  }
+
+  const base = supervisorApiBase.replace(/\/$/, "");
+  const action = process.env.SUPERVISOR_E2E_ACTION ?? "develop";
+  const chapterId = process.env.SUPERVISOR_E2E_CHAPTER_ID ?? "ch-verify";
+  const sceneId = process.env.SUPERVISOR_E2E_SCENE_ID ?? "sc-verify";
+  const draft =
+    process.env.SUPERVISOR_E2E_DRAFT ??
+    "Runtime verification draft. The beacon shudders once before holding steady over the fog.";
+
+  console.log(`Supervisor e2e start: ${base}`);
+  const sessionCreated = await httpJson<{ session_id: string }>(`${base}/api/session`, {
+    method: "POST",
+    body: JSON.stringify({ project_id: "runtime-verify", book_id: "runtime-verify" })
+  });
+
+  const sessionId = sessionCreated.session_id;
+  if (!sessionId) {
+    throw new Error("Supervisor e2e failed to create session");
+  }
+
+  const runCreated = await httpJson<{ run_id: string }>(`${base}/api/session/${encodeURIComponent(sessionId)}/message`, {
+    method: "POST",
+    body: JSON.stringify({
+      action,
+      chapter_id: chapterId,
+      scene_id: sceneId,
+      draft
+    })
+  });
+
+  const runId = runCreated.run_id;
+  if (!runId) {
+    throw new Error("Supervisor e2e failed to start run");
+  }
+
+  console.log(`Supervisor e2e run started -> ${runId}`);
+
+  const started = Date.now();
+  const timeoutMs = supervisorTimeoutSeconds * 1000;
+  const pollMs = supervisorPollSeconds * 1000;
+  let lastStatus = "UNKNOWN";
+
+  while (Date.now() - started < timeoutMs) {
+    const statusPayload = await httpJson<{
+      status?: string;
+      error?: string | null;
+      artifacts?: { count?: number; all?: Array<{ kind?: string }> };
+    }>(`${base}/api/session/${encodeURIComponent(sessionId)}/runs/${encodeURIComponent(runId)}`, {
+      method: "GET"
+    });
+
+    lastStatus = statusPayload.status ?? "UNKNOWN";
+    const artifactCount = statusPayload.artifacts?.count ?? 0;
+    console.log(`Supervisor e2e poll: status=${lastStatus} artifacts=${artifactCount}`);
+
+    if (lastStatus === "SUCCEEDED") {
+      const artifactKinds = new Set((statusPayload.artifacts?.all ?? []).map((entry) => entry.kind).filter(Boolean));
+      const requiredKinds = ["foundry-output", "ghostwriter-output", "evaluator-report"];
+      for (const kind of requiredKinds) {
+        if (!artifactKinds.has(kind)) {
+          throw new Error(`Supervisor e2e missing required artifact kind: ${kind}`);
+        }
+      }
+
+      console.log(`OK: Supervisor API e2e succeeded -> ${runId}`);
+      return;
+    }
+
+    if (lastStatus === "FAILED" || lastStatus === "TIMED_OUT" || lastStatus === "ABORTED") {
+      const message = statusPayload.error ?? "no error message provided";
+      throw new Error(`Supervisor e2e run ended with ${lastStatus}: ${message}`);
+    }
+
+    await wait(pollMs);
+  }
+
+  throw new Error(`Supervisor e2e timed out after ${supervisorTimeoutSeconds}s (last status: ${lastStatus})`);
 }
 
 function validateLocalConfiguration(): void {
@@ -128,6 +222,39 @@ function requireEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+async function httpJson<T>(url: string, init: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init.headers ?? {})
+    }
+  });
+
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as T) : ({} as T);
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} for ${url}: ${text || "empty response"}`);
+  }
+
+  return payload;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
 }
 
 function isInferenceProfileId(id: string): boolean {

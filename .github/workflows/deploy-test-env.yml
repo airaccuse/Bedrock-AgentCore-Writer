@@ -255,9 +255,14 @@ jobs:
         env:
           VERIFY_RUNTIME_MODE: live
           VERIFY_RUNTIME_WRITE_TEST: "true"
+          VERIFY_SUPERVISOR_E2E: "true"
+          SUPERVISOR_E2E_TIMEOUT_SECONDS: "360"
+          SUPERVISOR_E2E_POLL_SECONDS: "5"
           ARTIFACT_DDB_TABLE: ""
+          SUPERVISOR_API_BASE: ""
         run: |
           export ARTIFACT_DDB_TABLE="$(terraform -chdir=$TERRAFORM_DIR output -raw artifact_table_name)"
+          export SUPERVISOR_API_BASE="$(terraform -chdir=$TERRAFORM_DIR output -raw supervisor_api_url)"
           npm run verify:runtime
 
       - name: Post-deploy smoke (Step Functions)
